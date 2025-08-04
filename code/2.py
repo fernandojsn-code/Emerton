@@ -786,53 +786,15 @@ def shuffle(cycle, cube: list):
         cube = move(cube)
     return cube
 
-
-def main():
-    """Função principal que inicializa o cubo mágico, interface gráfica e eventos de interação."""
-
-    # Definição manual das três camadas do cubo
-    # Cada elemento representa uma face (adesivo) do cubo
-    first_layer = [["orange", "blue", "white"], ["white", "orange"], ["green", "orange", "white"],
-                   ["green", "white"], ["green", "white", "red"], ["white", "red"], ["blue", "red", "white"],
-                   ["blue", "white"], ["white"]]
-
-    second_layer = [["orange", "blue"], ["orange"], ["orange", "green"], ["green"], ["red", "green"],
-                    ["red"], ["red", "blue"], ["blue"]]
-
-    third_layer = [["blue", "orange", "yellow"], ["yellow", "orange"], ["yellow", "orange", "green"],
-                   ["green", "yellow"], ["green", "red", "yellow"], ["yellow", "red"], ["yellow", "red", "blue"],
-                   ["blue", "yellow"], ["yellow"]]
-
-    # Constrói o cubo unindo todas as camadas na lista `rubik_cube`
-    global rubik_cube
-    global solved_cube
-    for layer in (first_layer, second_layer, third_layer):
-        for face in layer:
-            rubik_cube.append(face)
-    
-    # Salva o estado resolvido como referência
-    solved_cube = rubik_cube
-
-    # Inicialização do Pygame
-    pygame.init()
-    pygame.font.init()
-    display = (800, 600)  # Tamanho da janela
-
-    # Criação da janela com suporte a OpenGL
-    screen = pygame.display.set_mode(display, DOUBLEBUF | OPENGL)
-    
-    # Ícone da janela
-    icon = pygame.image.load('rubik.png')
-    pygame.display.set_icon(icon)
-
-    # Fonte usada para textos
-    font = pygame.font.SysFont('lucinda console', 64)
-
-    # Título da janela
-    pygame.display.set_caption("Rubik Cube")
+def run_simulation(screen, font):
+    """
+    Executa o loop principal da simulação do cubo mágico.
+    Todo o código do seu antigo 'while True' virá para cá.
+    """
+    global rubik_cube # Precisamos acessar a variável global
 
     # Configuração da câmera 3D com perspectiva
-    gluPerspective(45, (display[0] / display[1]), 0.1, 50.0)
+    gluPerspective(45, (screen.get_width() / screen.get_height()), 0.1, 50.0)
 
     # Translação para afastar a câmera e posicioná-la
     glTranslatef(6.0, -1.0, -20)
@@ -895,7 +857,6 @@ def main():
                     rubik_cube = l_move(rubik_cube)
                     l_key = True
 
-
                 # M move (camada do meio)
                 if event.key == pygame.K_6:
                     rubik_cube = m_move(rubik_cube)
@@ -930,8 +891,9 @@ def main():
                 # Resolver a cruz branca
                 if event.key == pygame.K_q:
                     first_white_key = True
-
-        # Rotação da câmera via mouse
+        
+        # O resto do seu loop de eventos e lógica continua aqui...
+        # ... (código de rotação do mouse, etc.) ...
         for event in pygame.mouse.get_pressed(3):
             if event:
                 if abs(prev_pos_x - pygame.mouse.get_pos()[0]) == 0:
@@ -954,7 +916,7 @@ def main():
         elif u_key:
             rubik_cube = u_move(rubik_cube)
             u_key = False
-        elif r_key:
+        elif d_key:
             rubik_cube = d_move(rubik_cube)
             r_key = False
         elif m_key:
@@ -973,9 +935,9 @@ def main():
         elif sexy_key:
             rubik_cube = sexy_move(rubik_cube)
             sexy_key = False
+            sexy_key = False
         elif first_white_key:
-            # Executa o algoritmo de resolução da cruz branca em thread separada
-            threading.Thread(target=solving()).start()
+            threading.Thread(target=solving()).start()            
             first_white_key = False
 
         # Desenha as três camadas do cubo
@@ -988,5 +950,138 @@ def main():
         pygame.time.wait(20)
 
 
+# Adicione esta função também ANTES da sua nova função main()
+def show_start_screen(screen, font):
+    """
+    Mostra a tela de início usando uma projeção ortográfica 2D.
+    """
+    width, height = screen.get_size()
+
+    # Prepara os textos que serão exibidos (usando a fonte padrão, que é mais segura)
+    title_font = pygame.font.Font(None, 80)
+    prompt_font = pygame.font.Font(None, 30)
+
+    title_text_surface = title_font.render("Rubik's Cube 3D", True, (255, 255, 0)) # Amarelo
+    prompt_text_surface = prompt_font.render("Pressione ENTER para comecar", True, (255, 255, 255)) # Branco
+
+    waiting = True
+    while waiting:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                quit()
+            if event.type == pygame.KEYUP:
+                if event.key == pygame.K_RETURN:
+                    waiting = False
+
+        # 1. Limpa a tela
+        glClearColor(0.1, 0.1, 0.2, 1.0) # Fundo azul escuro
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+        # 2. Salva a configuração da matriz de projeção 3D atual
+        glMatrixMode(GL_PROJECTION)
+        glPushMatrix()
+
+        # 3. Configura o modo 2D (projeção ortográfica)
+        glLoadIdentity()
+        gluOrtho2D(0, width, 0, height) # Mapeia o sistema de coordenadas para o tamanho da tela
+
+        # 4. Salva a configuração da matriz de visualização atual
+        glMatrixMode(GL_MODELVIEW)
+        glPushMatrix()
+        glLoadIdentity()
+
+        # 5. Prepara para desenhar com texturas (o texto)
+        glEnable(GL_BLEND) # Habilita a transparência
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        glEnable(GL_TEXTURE_2D)
+
+        # --- Função para desenhar uma superfície Pygame como textura ---
+        def draw_text(surface, x, y):
+            text_data = pygame.image.tostring(surface, "RGBA", True)
+            tex_id = glGenTextures(1)
+            glBindTexture(GL_TEXTURE_2D, tex_id)
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, surface.get_width(), surface.get_height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, text_data)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+
+            glBegin(GL_QUADS)
+            glTexCoord2f(0, 0); glVertex2f(x, y)
+            glTexCoord2f(1, 0); glVertex2f(x + surface.get_width(), y)
+            glTexCoord2f(1, 1); glVertex2f(x + surface.get_width(), y + surface.get_height())
+            glTexCoord2f(0, 1); glVertex2f(x, y + surface.get_height())
+            glEnd()
+            glDeleteTextures(1, [tex_id])
+
+        # 6. Centraliza e desenha os textos
+        # O sistema de coordenadas do gluOrtho2D começa no canto INFERIOR-ESQUERDO
+        title_x = (width - title_text_surface.get_width()) / 2
+        title_y = height * 0.6  # Posiciona mais para cima
+        prompt_x = (width - prompt_text_surface.get_width()) / 2
+        prompt_y = height * 0.5
+
+        draw_text(title_text_surface, title_x, title_y)
+        draw_text(prompt_text_surface, prompt_x, prompt_y)
+
+
+        # 7. Desabilita as configurações 2D
+        glDisable(GL_TEXTURE_2D)
+        glDisable(GL_BLEND)
+
+        # 8. Restaura as matrizes de visualização e projeção 3D originais
+        glPopMatrix()
+        glMatrixMode(GL_PROJECTION)
+        glPopMatrix()
+        glMatrixMode(GL_MODELVIEW) # Volta para a matriz de visualização como padrão
+
+        # 9. Atualiza a tela
+        pygame.display.flip()
+        pygame.time.wait(100)
+def main():
+    """
+    Função principal que inicializa o cubo, a interface e controla o fluxo do programa.
+    """
+    global rubik_cube
+    global solved_cube
+    
+    # Definição das camadas (como no seu código original)
+    first_layer = [["orange", "blue", "white"], ["white", "orange"], ["green", "orange", "white"],
+                   ["green", "white"], ["green", "white", "red"], ["white", "red"], ["blue", "red", "white"],
+                   ["blue", "white"], ["white"]]
+    second_layer = [["orange", "blue"], ["orange"], ["orange", "green"], ["green"], ["red", "green"],
+                    ["red"], ["red", "blue"], ["blue"]]
+    third_layer = [["blue", "orange", "yellow"], ["yellow", "orange"], ["yellow", "orange", "green"],
+                   ["green", "yellow"], ["green", "red", "yellow"], ["yellow", "red"], ["yellow", "red", "blue"],
+                   ["blue", "yellow"], ["yellow"]]
+
+    # Constrói o cubo
+    for layer in (first_layer, second_layer, third_layer):
+        for face in layer:
+            rubik_cube.append(face)
+    solved_cube = list(rubik_cube)
+
+    # Inicialização do Pygame
+    pygame.init()
+    pygame.font.init()
+    display = (800, 600)
+
+    # Criação da janela com suporte a OpenGL
+    screen = pygame.display.set_mode(display, DOUBLEBUF | OPENGL)
+    
+    # Ícone e Título
+    icon = pygame.image.load('rubik.png')
+    pygame.display.set_icon(icon)
+    pygame.display.set_caption("Rubik Cube")
+    
+    # Fonte (pode ser usada em outras partes se necessário)
+    font = pygame.font.SysFont('lucinda console', 64)
+    
+    # --- Controle de Fluxo ---
+    # 1. Mostra a tela de início
+    show_start_screen(screen, font)
+    
+    # 2. Quando a tela de início termina, inicia a simulação do cubo
+    run_simulation(screen, font)
+          
 if __name__ == '__main__':
     main()
